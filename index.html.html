@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SIP, Lumpsum &amp; SWP Calculator</title>
+<style>
+:root{--bg:#f4f7f5;--card:#fff;--ink:#14231c;--mute:#5d6f66;--line:#dbe5df;--acc:#0a7d5a;--accsoft:#e2f4ec;--c1:#5b6cf2;--c2:#12b886;--c3:#f59f00;--field:#f0f5f2;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1713;--card:#17231d;--ink:#e8f1ec;--mute:#93a79c;--line:#26372f;--acc:#2fd3a0;--accsoft:#1c3a2f;--field:#1d2c25;--c1:#8c98ff;--c2:#2fd3a0;--c3:#ffc247}}
+:root[data-theme="dark"]{--bg:#0f1713;--card:#17231d;--ink:#e8f1ec;--mute:#93a79c;--line:#26372f;--acc:#2fd3a0;--accsoft:#1c3a2f;--field:#1d2c25;--c1:#8c98ff;--c2:#2fd3a0;--c3:#ffc247}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.45}
+main{max-width:560px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:1.5rem;margin:4px 0 4px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 16px;font-size:.95rem}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px}
+.tabs button{flex:0 0 auto;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;font-size:.9rem;padding:9px 14px;border-radius:10px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--acc);color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tabs button[aria-selected="true"]{color:#06261c}}
+.tabs button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
+.hint{background:var(--accsoft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin:0 0 16px}
+.f{margin-bottom:18px}
+.fh{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.fh label{font-weight:600;font-size:.95rem}
+.num{display:flex;align-items:center;background:var(--field);border-radius:10px;padding:0 10px;width:140px}
+.num span{color:var(--mute);font-size:.9rem}
+.num input{border:0;background:none;color:var(--ink);font:inherit;font-weight:700;text-align:right;width:100%;padding:8px 4px;outline-offset:6px;min-width:0}
+input[type=range]{width:100%;accent-color:var(--acc);margin:0}
+.chk{display:flex;gap:8px;align-items:center;font-size:.9rem;margin-bottom:6px}
+.res{margin-top:16px}
+.res h2{font-size:1.05rem;margin:0 0 12px}
+.pie{display:flex;justify-content:center;margin:6px 0 10px}
+svg{max-width:260px;width:100%;height:auto}
+svg circle.seg{transition:stroke-dasharray .7s ease,stroke-dashoffset .7s ease}
+@media (prefers-reduced-motion:reduce){svg circle.seg{transition:none}}
+.leg{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;margin-bottom:14px;font-size:.9rem}
+.leg i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px}
+.rows div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.rows div span:first-child{color:var(--mute)}
+.rows b{text-align:right}
+.rows .big{font-size:1.05rem}
+.rows .big b{color:var(--acc)}
+.warn{background:#fff1d6;color:#6b4300;border-radius:10px;padding:10px 12px;font-size:.9rem;margin-bottom:12px}
+.note{color:var(--mute);font-size:.8rem;margin-top:14px}
+.fd{color:var(--mute);font-size:.82rem;margin-top:6px}
+</style>
+</head>
+<body>
+<main>
+<h1>Investment calculator</h1>
+<p class="sub">Plan SIP, lumpsum and withdrawal strategies, with inflation built in.</p>
+<div class="tabs" role="tablist" id="tabs"></div>
+<section class="card">
+  <p class="hint" id="hint"></p>
+  <div id="fields"></div>
+  <div class="res">
+    <h2>Results</h2>
+    <div id="warn"></div>
+    <div class="pie"><svg viewBox="0 0 200 200" id="pie" role="img" aria-label="Breakdown chart"></svg></div>
+    <div class="leg" id="leg"></div>
+    <div class="rows" id="rows"></div>
+  </div>
+  <p class="note">Estimates only. SIP and SWP use monthly compounding; lumpsum and SWP→Lumpsum use annual compounding on the headline return (same as most Indian lumpsum calculators). SWP withdrawals happen at the start of each month. No tax or expense ratio. Real value is in today’s purchasing power.</p>
+</section>
+</main>
+<script>
+(function(){
+var inr=function(n){return "₹"+Math.round(n).toLocaleString("en-IN")};
+var short=function(n){var a=Math.abs(n);return a>=1e7?"₹"+(n/1e7).toFixed(2)+" Cr":a>=1e5?"₹"+(n/1e5).toFixed(2)+" L":inr(n)};
+var Y={k:"y",l:"Period (years)",min:1,max:50,step:1,v:20,u:"yrs"};
+var R=function(v){return {k:"r",l:"Expected return (p.a.)",min:1,max:30,step:.1,v:v,u:"%"}};
+var I={k:"i",l:"Inflation rate (p.a.)",min:0,max:15,step:.1,v:0,u:"%"};
+var MODES=[
+{id:"sip",t:"SIP",h:"Invest a fixed amount every month and see what it grows to.",f:[{k:"m",l:"Monthly investment",min:500,max:200000,step:500,v:10000,u:"₹"},Y,R(12),I]},
+{id:"lump",t:"Lumpsum",h:"Invest once and let it compound.",f:[{k:"L",l:"Lumpsum amount",min:10000,max:50000000,step:10000,v:1000000,u:"₹"},Y,R(12),I]},
+{id:"swp",t:"SWP",h:"Start with a corpus and withdraw a fixed amount every month.",f:[{k:"L",l:"Lumpsum amount",min:100000,max:100000000,step:100000,v:93000000,u:"₹"},{k:"w",l:"Monthly withdrawal",min:1000,max:1000000,step:1000,v:200000,u:"₹"},{k:"y",l:"Period (years)",min:1,max:50,step:1,v:20,u:"yrs"},R(10),I],step:true},
+{id:"swpsip",t:"SWP → SIP",h:"Want a monthly income later? Find the SIP you need today. Withdrawals are in today’s money and rise with inflation.",f:[{k:"w",l:"Monthly withdrawal needed",min:1000,max:1000000,step:1000,v:50000,u:"₹"},{k:"a",l:"Withdrawals begin in (years)",d:"Years from today until your first withdrawal.",min:1,max:50,step:1,v:20,u:"yrs"},{k:"y",l:"Withdrawals continue for (years)",d:"How long the monthly withdrawals last once they begin.",min:1,max:50,step:1,v:20,u:"yrs"},R(12),I]},
+{id:"swplump",t:"SWP → Lumpsum",h:"Need a one-time amount later? Find the lumpsum to invest today. The amount is in today’s money.",f:[{k:"W",l:"Amount needed",min:10000,max:50000000,step:10000,v:1000000,u:"₹"},{k:"a",l:"Needed in (years)",d:"Years from today until you need the money.",min:1,max:50,step:1,v:10,u:"yrs"},R(12),I]}
+];
+var cur=MODES[0],val={};
+function calc(m,p){
+  var r=p.r/100,i=p.r/1200,g=p.i/100,res={rows:[],pie:[],warn:""},n,fv,inv;
+  if(m.id==="sip"){
+    n=p.y*12;fv=i?p.m*((Math.pow(1+i,n)-1)/i)*(1+i):p.m*n;inv=p.m*n;
+    var real=fv/Math.pow(1+g,p.y);
+    res.pie=[["Invested",inv,"--c1"],["Est. returns",fv-inv,"--c2"]];res.c=["Total value",fv];
+    res.rows=[["Invested amount",inr(inv)],["Est. returns",inr(fv-inv)],["Total value",inr(fv),1],["Real value (inflation-adjusted)",inr(real),1]];
+  }else if(m.id==="lump"){
+    fv=p.L*Math.pow(1+r,p.y);var rl=fv/Math.pow(1+g,p.y);
+    res.pie=[["Invested",p.L,"--c1"],["Est. returns",fv-p.L,"--c2"]];res.c=["Total value",fv];
+    res.rows=[["Invested amount",inr(p.L)],["Est. returns",inr(fv-p.L)],["Total value",inr(fv),1],["Real value (inflation-adjusted)",inr(rl),1]];
+  }else if(m.id==="swp"){
+    var bal=p.L,tot=0,dep=0,nn=p.y*12,wd;
+    for(var k=1;k<=nn;k++){
+      wd=p.step?p.w*Math.pow(1+g,Math.floor((k-1)/12)):p.w;
+      if(bal<wd){tot+=bal;bal=0;dep=k;break}
+      bal-=wd;tot+=wd;bal*=1+i;
+    }
+    if(dep)res.warn="Your corpus runs out in year "+Math.ceil(dep/12)+" (month "+dep+"). Lower the withdrawal or raise the return.";
+    var rf=bal/Math.pow(1+g,p.y);
+    res.pie=[["Final value",bal,"--c2"],["Total withdrawn",tot,"--c3"]];res.c=["Final value",bal];
+    res.rows=[["Invested amount",inr(p.L)],["Total withdrawn",inr(tot)],["Total interest earned",inr(bal+tot-p.L)],["Final value",inr(bal),1],["Real final value (today’s money)",inr(rf),1]];
+  }else if(m.id==="swpsip"){
+    n=p.a*12;var pv=0,tw=0,w1=0,w;
+    for(var j=0;j<p.y*12;j++){
+      w=p.w*Math.pow(1+g,p.a+Math.floor(j/12));if(j===0)w1=w;tw+=w;pv+=w/Math.pow(1+i,j);
+    }
+    var fac=i?((Math.pow(1+i,n)-1)/i)*(1+i):n,s=pv/fac;inv=s*n;
+    res.pie=[["Invested",inv,"--c1"],["Est. returns",pv-inv,"--c2"]];res.c=["Corpus needed",pv];
+    res.rows=[["Monthly SIP required",inr(s),1],["Total invested",inr(inv)],["Est. returns",inr(pv-inv)],["Corpus at withdrawal start",inr(pv),1],["First monthly withdrawal",inr(w1)],["Total withdrawn",inr(tw)]];
+  }else{
+    var need=p.W*Math.pow(1+g,p.a),now=need/Math.pow(1+r,p.a);
+    res.pie=[["Invest today",now,"--c1"],["Est. returns",need-now,"--c2"]];res.c=["Amount at end",need];
+    res.rows=[["Lumpsum to invest today",inr(now),1],["Est. returns",inr(need-now)],["Amount needed after "+p.a+" yrs",inr(need),1]];
+  }
+  return res;
+}
+function pie(res){
+  var C=2*Math.PI*70,tot=0,off=0,h="",lg="";
+  res.pie.forEach(function(s){tot+=Math.max(0,s[1])});
+  h='<circle cx="100" cy="100" r="70" fill="none" stroke="var(--line)" stroke-width="32"/>';
+  res.pie.forEach(function(s){
+    var f=tot>0?Math.max(0,s[1])/tot:0,len=f*C;
+    h+='<circle class="seg" cx="100" cy="100" r="70" fill="none" stroke="var('+s[2]+')" stroke-width="32" transform="rotate(-90 100 100)" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'"/>';
+    off+=len;
+    lg+='<span><i style="background:var('+s[2]+')"></i>'+s[0]+" "+(tot>0?(f*100).toFixed(1):0)+"%</span>";
+  });
+  h+='<text x="100" y="94" text-anchor="middle" font-size="11" fill="var(--mute)">'+res.c[0]+'</text><text x="100" y="114" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">'+short(res.c[1])+'</text>';
+  document.getElementById("pie").innerHTML=h;
+  document.getElementById("leg").innerHTML=lg;
+}
+function render(){
+  var p={},m=cur;
+  m.f.forEach(function(f){p[f.k]=parseFloat(val[m.id][f.k])||0});
+  if(m.step)p.step=document.getElementById("stp")&&document.getElementById("stp").checked;
+  var res=calc(m,p);
+  document.getElementById("warn").innerHTML=res.warn?'<div class="warn">'+res.warn+"</div>":"";
+  pie(res);
+  document.getElementById("rows").innerHTML=res.rows.map(function(r){return '<div class="'+(r[2]?"big":"")+'"><span>'+r[0]+"</span><b>"+r[1]+"</b></div>"}).join("");
+}
+function build(){
+  var m=cur,box=document.getElementById("fields");
+  document.getElementById("hint").textContent=m.h;
+  box.innerHTML="";
+  m.f.forEach(function(f){
+    var d=document.createElement("div");d.className="f";
+    var pre=f.u==="₹"?"₹":"",suf=f.u==="₹"?"":f.u;
+    d.innerHTML='<div class="fh"><label for="n_'+f.k+'">'+f.l+'</label><div class="num"><span>'+pre+'</span><input type="number" inputmode="decimal" id="n_'+f.k+'" min="0" step="'+f.step+'"><span>'+suf+'</span></div></div><input type="range" aria-label="'+f.l+'" id="s_'+f.k+'" min="'+f.min+'" max="'+f.max+'" step="'+f.step+'">'+(f.d?'<div class="fd">'+f.d+'</div>':'');
+    box.appendChild(d);
+    var n=d.querySelector("#n_"+f.k),s=d.querySelector("#s_"+f.k);
+    n.value=val[m.id][f.k];s.value=val[m.id][f.k];
+    n.oninput=function(){val[m.id][f.k]=n.value;s.value=n.value;render()};
+    s.oninput=function(){val[m.id][f.k]=s.value;n.value=s.value;render()};
+  });
+  if(m.step){
+    var c=document.createElement("label");c.className="chk";
+    c.innerHTML='<input type="checkbox" id="stp"> Raise withdrawals each year by the inflation rate';
+    box.appendChild(c);c.querySelector("input").onchange=render;
+  }
+  render();
+}
+var tb=document.getElementById("tabs");
+MODES.forEach(function(m){
+  val[m.id]={};m.f.forEach(function(f){val[m.id][f.k]=f.v});
+  var b=document.createElement("button");b.textContent=m.t;b.setAttribute("role","tab");
+  b.onclick=function(){cur=m;[].forEach.call(tb.children,function(x){x.setAttribute("aria-selected",x===b)});build()};
+  b.setAttribute("aria-selected",m===cur);tb.appendChild(b);
+});
+build();
+// ponytail: sanity check against Groww lumpsum & MF SWP reference (fails loudly if formulas drift)
+(function sanity(){
+  var i=10/1200,bal=93e6,tot=0,w=2e5;
+  for(var k=0;k<240;k++){bal-=w;tot+=w;bal*=1+i;}
+  if(Math.abs(bal-528371466)>2e6||tot!==48e6) throw new Error("SWP reference check failed");
+  if(Math.abs(1e6*Math.pow(1.12,40)-93050970)>1e6) throw new Error("Lumpsum reference check failed");
+})();
+})();
+</script>
+</body>
+</html>
